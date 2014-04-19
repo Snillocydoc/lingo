@@ -1,0 +1,423 @@
+<html>
+    <head>
+        <style type = "text/css">
+
+            div#content {
+                width:  45em;
+                margin: auto;
+                background-color:  #dddddd;
+                padding: 0.5em;
+            }
+            div.code {
+                width:  80%;
+                margin: auto;
+                background-color:  #000000;
+                color:  #bbbbbb;
+                padding: 0.5em;
+            }
+            img {
+                width:  100%;
+                margin:  0 auto;
+            }
+            td {
+                width:  5em;
+                height:  1em;
+                border:  1px solid black;
+                text-align: center;
+                font-weight: bold;
+            }
+
+        </style>
+        <script src = 'http://code.jquery.com/jquery-latest.js' ></script>
+        <script type="text/javascript">
+
+            //read local data and start the game
+            function readLocalData()
+            {
+
+                if (typeof(Storage) !== "undefined")
+                {
+                    if (localStorage.name && localStorage.roundsPlayed)
+                    {
+                        var name = JSON.parse(localStorage.name);
+                    }
+                    else
+                    {
+                        var name = prompt("Please enter your name:");
+                        localStorage.name = JSON.stringify(name);
+                        localStorage.roundsPlayed = JSON.stringify(0);
+                        localStorage.roundsWon = JSON.stringify(0);
+                        localStorage.puzzlesPlayed = JSON.stringify(0);
+                        localStorage.puzzlesWon = JSON.stringify(0);
+                    }
+                }
+                startGame();
+            }
+            
+            var guessed;
+            var words;
+            var word;
+            var httpRequest;
+            var puzzlesWon;
+            var guessNum;
+            var puzzlesPlayed;
+            var timeID;
+            var stopGame = false;
+            //begins AJAJ request, then calls startRound()
+            function startGame()
+            {
+                stopGame=false;
+
+                if (window.XMLHttpRequest)
+                {
+                    httpRequest = new XMLHttpRequest();
+
+                }
+                else
+                {
+                    httpRequest = new ActiveXObject("Microsoft.XMLHTTP");
+                }
+
+                httpRequest.open('GET', 'words.php', true);
+                httpRequest.send(null);
+                httpRequest.onreadystatechange = function()
+                {
+                    startRound(httpRequest);
+                }
+            }
+            function donePuzzle()
+            {
+                //clear the timeout
+                clearTimeout(timeID);
+
+                puzzlesPlayed++;
+                //stores new information from recent round played
+                if (typeof(Storage) !== "undefined")
+                {
+                    localStorage.roundsPlayed = JSON.stringify(parseInt(JSON.parse(localStorage.roundsPlayed)) + 1);
+                    localStorage.puzzlesWon = JSON.stringify(parseInt(JSON.parse(localStorage.puzzlesWon)) + puzzlesWon);
+                }
+                //if they still have more rounds to play
+                if (puzzlesPlayed < 5 && puzzlesWon < 3)
+                {
+                    var answer = prompt("Submit Yes when you are ready to begin the next puzzle");
+                    if (answer == "Yes")
+                    {
+                        beginPuzzle(puzzlesPlayed);
+                    }
+                }
+                //if they won the game
+                else if (puzzlesWon == 3)
+                {
+                    alert("You won the round!");
+                    if (typeof(Storage) !== "undefined")
+                        localStorage.roundsWon = JSON.stringify(parseInt(JSON.parse(localStorage.roundsWon)) + 1);
+                    var an = prompt("Would you like to play another game?(Yes or No)");
+                    if (an == "Yes")
+                        startGame();
+                    else
+                    {
+                        stopGame = true;
+                        return;
+                    }
+                }
+                //if they lost the game
+                else
+                {
+                    alert("You lost the round :(");
+                    var an = prompt("Would you like to play another game?(Yes or No)");
+                    if (an == "Yes")
+                        startGame();
+                    else
+                    {
+                        stopGame = true;
+                        return;
+                    }
+                }
+
+
+
+            }
+
+            //initializes some variables, obtains words from AJAJ response
+            function startRound() {
+
+                if (httpRequest.readyState == 4 && httpRequest.status == 200)
+                {
+                    words = JSON.parse(httpRequest.responseText);
+                   
+                    puzzlesWon = 0;
+                    puzzlesPlayed = 0;
+                    beginPuzzle(0);
+                }
+            }
+            //begin puzzle
+            function beginPuzzle(num)
+            {
+                
+                guessed = true;
+                if (typeof(Storage) !== "undefined" && localStorage.puzzlesPlayed)
+                    localStorage.puzzlesPlayed = JSON.stringify(parseInt(JSON.parse(localStorage.puzzlesPlayed)) + 1);
+                guessNum = 0;
+                word = words[num];
+                alert(word);
+                $(document).ready(function() {
+                    $("td").each(function() {
+                        $(this).empty();
+                    });
+
+                    $('#table tr:first td:first').append(word[0]);
+                    $('#table tr:first td:first').css("color", "Red");
+                    $('#table tr:first td:first').css("text-transform", "capitalize");
+
+                });
+                //set timeout for first guess
+                timeID = setTimeout(function() {
+
+                    addRow();
+
+                }, 10000);
+
+
+            }
+
+
+            function addRow()
+            {
+                var createdRow = false;
+
+                clearTimeout(timeID);
+                guess = document.getElementById("guess").value;
+
+                var x = guessNum;
+                guessed = true;
+
+
+                if (guessNum >= 5)
+                {
+
+                    clearTimeout(timeID);
+                    donePuzzle();
+                    return;
+                }
+                var redString = new String();
+                var blueString = new String();
+                for (var y = 0; y < 5; y++)
+                {
+                    var t = "[" + guess[y] + "]";
+                    var reg = new RegExp(t, 'g');
+                    var red = 0;
+                    var blue = 0;
+                    var w = 0;
+                    //keep track of number of characters that are red and blue
+                    if (redString.match(reg) != null)
+                        red = redString.match(reg).length;
+                    if (blueString.match(reg) != null)
+                        blue = blueString.match(reg).length;
+                    if (word.match(reg) != null)
+                        w = word.match(reg).length;
+                    //if this character is in the correct position
+                    if (guess[y] == word[y])
+                    {
+                        redString = redString.concat(guess[y]);
+                        //alert(redString);
+                        $(document).ready(function() {
+                            $('#table tr:eq(' + (x + 1) + ') td:eq(' + y + ')').append(word[y]);
+                            $('#table tr:eq(' + (x + 1) + ') td:eq(' + y + ')').css("color", "Red");
+                            $('#table tr:eq(' + (x + 1) + ') td:eq(' + y + ')').css("text-transform", "capitalize");
+                        });
+                        if (redString.match(reg) != null)
+                            red = 0;
+                        else
+                            red = redString.match(reg).length;
+                            
+                        if(guess.indexOf(guess[y])<y&&guess.indexOf(guess[y])<word.indexOf(guess[y]))
+                        {
+                         
+                          $(document).ready(function() {
+                          $('#table tr:eq(' + (x + 1) + ') td:eq(' + guess.indexOf(guess[y]) + ')').css("color","Black");
+                          $('#table tr:eq(' + (x + 1) + ') td:eq(' + guess.indexOf(guess[y]) + ')').css("text-transform", "lowercase");
+                          $('#table tr:eq(' + (x + 1) + ') td:eq(' + y + ')').css("color", "Red");
+                          $('#table tr:eq(' + (x + 1) + ') td:eq(' + y + ')').css("text-transform", "capitalize");
+                          });
+                        }
+
+                        createdRow = true;
+                    }
+                    //if it is in word, but not correct position (and that has not already been guessed)
+                    else if ((word.indexOf(guess[y]) !== -1) && (red + blue) < w)
+                    {
+
+                        $(document).ready(function() {
+                            $('#table tr:eq(' + (x + 1) + ') td:eq(' + y + ')').append(guess[y]);
+
+                            $('#table tr:eq(' + (x + 1) + ') td:eq(' + y + ')').css("color", "Blue");
+                            $('#table tr:eq(' + (x + 1) + ') td:eq(' + y + ')').css("text-transform", "capitalize");
+                            blueString = blueString.concat(guess[y]);
+
+                        });
+                        if (blueString.match(reg) != null)
+                            blue = 0;
+                        else
+                            blue = blueString.match(reg).length;
+                        guessed = false;
+                        createdRow = true;
+                    }
+                    //if it is neither
+                    else
+                    {
+                        $(document).ready(function() {
+                            $('#table tr:eq(' + (x + 1) + ') td:eq(' + y + ')').append(guess[y]);
+                            $('#table tr:eq(' + (x + 1) + ') td:eq(' + y + ')').css("color", "Black");
+                            $('#table tr:eq(' + (x + 1) + ') td:eq(' + y + ')').css("text-transform", "lowercase");
+                        });
+                        guessed = false;
+                        createdRow = true;
+                    }
+                    
+                }
+                //quit current puzzle if they guessed it
+                if (guessed)
+                {
+                    createdRow = false;
+                    puzzlesWon++;
+                    alert("Correct puzzle!");
+                    clearTimeout(timeID);
+                    donePuzzle();
+                    return;
+                }
+                //don't increment if a row wasn't created
+                if (createdRow==true && word && guess)
+                {
+                    guessNum++;
+
+                }
+                //set a timeout unless the game was stopped
+                if (stopGame==false)
+                {
+                   
+                    timeID = setTimeout(function() {
+
+                        addRow();
+                    }, 10000);
+                }
+
+            }
+
+
+        </script>
+    </head>
+    <body onload="readLocalData()">
+
+        <input type="button" name="Submit" value="Submit" id="submit" onclick="addRow()">
+        <input type="text" id="guess" value="">
+
+        <br>
+        <table style="border:1px solid black;" id = "table" >
+
+            <tr>
+                <td>
+
+                </td>
+                <td>
+
+                </td>
+                <td>
+
+                </td>
+                <td>
+
+                </td>
+                <td>
+
+                </td>
+            </tr>
+            <tr>
+                <td>
+
+                </td>
+                <td>
+
+                </td>
+                <td>
+
+                </td>
+                <td>
+
+                </td>
+                <td>
+
+                </td>
+            </tr>
+            <tr>
+                <td>
+
+                </td>
+                <td>
+
+                </td>
+                <td>
+
+                </td>
+                <td>
+
+                </td>
+                <td>
+
+                </td>
+            </tr>
+            <tr>
+                <td>
+
+                </td>
+                <td>
+
+                </td>
+                <td>
+
+                </td>
+                <td>
+
+                </td>
+                <td>
+
+                </td>
+            </tr>
+            <tr>
+                <td>
+
+                </td>
+                <td>
+
+                </td>
+                <td>
+
+                </td>
+                <td>
+
+                </td>
+                <td>
+
+                </td>
+            </tr>
+            <tr>
+                <td>
+
+                </td>
+                <td>
+
+                </td>
+                <td>
+
+                </td>
+                <td>
+
+                </td>
+                <td>
+
+                </td>
+            </tr>
+
+        </table>
+    </body>
+</html>
